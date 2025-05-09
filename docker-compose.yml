@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_CFG_NODE_ID=${KAFKA_NODE_ID}
+      - KAFKA_CFG_PROCESS_ROLES=${KAFKA_PROCESS_ROLES}
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=${KAFKA_CONTROLLER_QUORUM_VOTERS}
+      - KAFKA_KRAFT_CLUSTER_ID=${KAFKA_CLUSTER_ID}
+      - KAFKA_CFG_LISTENERS=${KAFKA_LISTENERS}
+      - KAFKA_CFG_ADVERTISED_LISTENERS=${KAFKA_ADVERTISED_LISTENERS}
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=${KAFKA_CONTROLLER_LISTENER_NAMES}
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=${KAFKA_INTER_BROKER_LISTENER_NAME}
+    depends_on:
+      - zookeeper
+    networks:
+      - backend
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: zookeeper
+    ports:
+      - "2181:2181" 
+    environment:
+      - ZOO_ENABLE_AUTH=${ZOO_ENABLE_AUTH}
+      - ALLOW_ANONYMOUS_LOGIN=${ALLOW_ANONYMOUS_LOGIN}
+      - ZOOKEEPER_CLIENT_PORT=${ZOOKEEPER_CLIENT_PORT}
+      - ZOOKEEPER_TICK_TIME=${ZOOKEEPER_TICK_TIME}
+    networks:
+      - backend
+
+  airflow:
+    image: bitnami/airflow:latest
+    container_name: airflow
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
+      - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
+      - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
+      - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
+    volumes:
+      - ./dags:/usr/local/airflow/dags
+    networks:
+      - backend
+    depends_on:
+      - postgresql
+
+  postgresql:
+    image: bitnami/postgresql:latest
+    restart: always
+    environment:
+      - POSTGRESQL_USERNAME=${POSTGRESQL_USERNAME}
+      - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+      - POSTGRESQL_DATABASE=${POSTGRESQL_DATABASE}
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+
+  init-db:
+    image: python:3.12-slim
+    depends_on:
+      - postgresql
+    volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d
+      - ./postgres-init/init_db.py:/init_db.py
+    environment:
+      - POSTGRESQL_USERNAME=${POSTGRESQL_USERNAME}
+      - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
+      - DATABASE_HOST=${DATABASE_HOST}
+      - DATABASE_PORT=${DATABASE_PORT}
+      - MLFLOW_DATABASE_NAME=${MLFLOW_DATABASE_NAME}
+    networks:
+      - backend
+    entrypoint: >
+      bash -c "pip install psycopg2-binary python-dotenv && python /init_db.py"
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    networks:
+      - backend
+    volumes:
+      - ./pgadmin:/var/lib/pgadmin
+
+  mlflow:
+    image: bitnami/mlflow:latest 
+    container_name: mlflow
+    restart: unless-stopped
+    ports:
+      - "5000:5000" # MLflow UI at http://localhost:5000
+    environment:
+      - BACKEND_STORE_URI=${BACKEND_STORE_URI}
+      - ARTIFACT_ROOT=${ARTIFACT_ROOT}
+      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
+    volumes:
+      - ./mlflow:/mlflow
+    networks:
+      - backend
+    entrypoint: mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRESQL_USERNAME}:${POSTGRESQL_PASSWORD}@postgresql:5432/bitnami_mlflow --default-artifact-root minio://${MLFLOW_S3_BUCKET}/ --artifacts-destination minio://${MLFLOW_S3_BUCKET}/ -h 0.0.0.0
+    depends_on:
+      - minio
+      - init-db
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./minio/data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
