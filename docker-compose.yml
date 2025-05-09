@@ -39,7 +39,7 @@ services:
     container_name: airflow
     restart: on-failure
     ports:
-      - "8080:8080"
+      - "8080:8080" 
     environment:
       - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
       - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
@@ -77,6 +77,7 @@ services:
       - DATABASE_HOST=${DATABASE_HOST}
       - DATABASE_PORT=${DATABASE_PORT}
       - MLFLOW_DATABASE_NAME=${MLFLOW_DATABASE_NAME}
+      - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
     networks:
       - backend
     entrypoint: >
@@ -86,7 +87,7 @@ services:
     image: dpage/pgadmin4
     container_name: pgadmin
     ports:
-      - "5050:80"
+      - "5050:80" # pgAdmin UI at http://localhost:5050
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
@@ -109,7 +110,7 @@ services:
       - ./mlflow:/mlflow
     networks:
       - backend
-    entrypoint: mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRESQL_USERNAME}:${POSTGRESQL_PASSWORD}@postgresql:5432/bitnami_mlflow --default-artifact-root minio://${MLFLOW_S3_BUCKET}/ --artifacts-destination minio://${MLFLOW_S3_BUCKET}/ -h 0.0.0.0
+    entrypoint: mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRESQL_USERNAME}:${POSTGRESQL_PASSWORD}@${DATABASE_HOST}:5432/${MLFLOW_DATABASE_NAME} --default-artifact-root minio://${MLFLOW_S3_BUCKET}/ --artifacts-destination minio://${MLFLOW_S3_BUCKET}/ -h 0.0.0.0
     depends_on:
       - minio
       - init-db
@@ -119,7 +120,7 @@ services:
     container_name: minio
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "9000:9000" # MinIO UI at http://localhost:9000
       - "9001:9001"
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}

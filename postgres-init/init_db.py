@@ -13,6 +13,7 @@ DATABASE_PORT = int(os.getenv("DATABASE_PORT", 5432))
 POSTGRESQL_USERNAME = os.getenv("POSTGRESQL_USERNAME")
 POSTGRESQL_PASSWORD = os.getenv("POSTGRESQL_PASSWORD")
 MLFLOW_DATABASE_NAME = os.getenv("MLFLOW_DATABASE_NAME")  # Diferente de POSTGRESQL_DATABASE
+AIRFLOW_DATABASE_NAME = os.getenv("AIRFLOW_DATABASE_NAME")  # Diferente de POSTGRESQL_DATABASE
 INIT_SQL_FILE = os.getenv("INIT_INIT_SQL_FILE")
 
 print(f"DATABASE_HOST: {DATABASE_HOST}")
@@ -20,6 +21,7 @@ print(f"DATABASE_PORT: {DATABASE_PORT}")
 print(f"POSTGRESQL_USERNAME: {POSTGRESQL_USERNAME}")
 print(f"POSTGRESQL_PASSWORD: {POSTGRESQL_PASSWORD}")
 print(f"MLFLOW_DATABASE_NAME: {MLFLOW_DATABASE_NAME}")
+print(f"AIRFLOW_DATABASE_NAME: {AIRFLOW_DATABASE_NAME}")
 print(f"INIT_SQL_FILE: {INIT_SQL_FILE}")
 
 def wait_for_postgres():
@@ -107,6 +109,6 @@ def execute_INIT_SQL_FILE():
 
 if __name__ == "__main__":
     wait_for_postgres()
-    list_databases()
     create_database_if_not_exists(MLFLOW_DATABASE_NAME)
-    execute_INIT_SQL_FILE()
+    create_database_if_not_exists(AIRFLOW_DATABASE_NAME)
+    list_databases()
