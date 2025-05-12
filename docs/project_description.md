@@ -43,9 +43,9 @@
 
 - [X] Docker Compose with Kafka, PostgreSQL, MinIO, MLflow
 
-- [ ] Create Kafka topics (e.g., sensor-data)
+- [X] Create Kafka topics (e.g., sensor-data)
 
-- [ ] Create PostgreSQL schema (sensor_readings table)
+- [X] Create PostgreSQL schema (sensor_readings table)
 
 - [ ] Setup MinIO bucket for .pickle files
 
