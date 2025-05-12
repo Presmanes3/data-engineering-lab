@@ -3,7 +3,8 @@ services:
     image: bitnami/kafka:latest
     container_name: kafka
     ports:
-      - "9092:9092"
+      - "9092:9092" # Expose for containers
+      - "9094:9094" # Expose for host
     environment:
       - KAFKA_CFG_NODE_ID=${KAFKA_NODE_ID}
       - KAFKA_CFG_PROCESS_ROLES=${KAFKA_PROCESS_ROLES}
@@ -17,80 +18,94 @@ services:
     networks:
       - backend
 
-  airflow:
-    image: bitnami/airflow:latest
-    container_name: airflow
-    restart: on-failure
-    ports:
-      - "8080:8080"  # Airflow UI at http://localhost:8080
-
-    environment:
-      - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
-      - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
-      - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
-      - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
-      - AIRFLOW_USERNAME=${AIRFLOW_USERNAME}
-      - AIRFLOW_PASSWORD=${AIRFLOW_PASSWORD}
-    volumes:
-      - ./dags:/opt/bitnami/airflow/dags
+  init-kafka:
+    image: python:3.12-slim
+    build:
+      context: ./kafka-init
+    container_name: init-kafka
+    working_dir: /opt/bitnami/kafka/bin
     networks:
       - backend
-    depends_on:
-      - init-db
-
-  airflow-scheduler:
-    image: bitnami/airflow:latest
-    container_name: airflow-scheduler
-    environment:
-      - AIRFLOW_COMPONENT_TYPE=scheduler
-      - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
-      - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
-      - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
-      - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
-      - AIRFLOW_LOAD_EXAMPLES=no
-      - AIRFLOW_WEBSERVER_HOST=${AIRFLOW_WEBSERVER_HOST}
-    networks:
-      - backend
-    depends_on:
-      - airflow
     volumes:
-      - ./dags:/opt/bitnami/airflow/dags
-
-  airflow-trigger:
-    image: bitnami/airflow:latest
-    container_name: airflow-trigger
-    environment:
-      - AIRFLOW_COMPONENT_TYPE=triggerer
-      - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
-      - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
-      - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
-      - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
-      - AIRFLOW_WEBSERVER_HOST=${AIRFLOW_WEBSERVER_HOST}
-      - AIRFLOW_LOAD_EXAMPLES=no
-    networks:
-      - backend
+      - ./services/kafka-init:/app  # Montamos el directorio local 'init-kafka' en el contenedor
+    entrypoint: /bin/bash -c "pip install -r /app/requirements.txt && python /app/create_topics.py"
     depends_on:
-      - airflow
-    volumes:
-      - ./dags:/opt/bitnami/airflow/dags
+      - kafka
+
+  # airflow:
+  #   image: bitnami/airflow:latest
+  #   container_name: airflow
+  #   restart: on-failure
+  #   ports:
+  #     - "8080:8080"  # Airflow UI at http://localhost:8080
+
+  #   environment:
+  #     - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
+  #     - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
+  #     - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
+  #     - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
+  #     - AIRFLOW_USERNAME=${AIRFLOW_USERNAME}
+  #     - AIRFLOW_PASSWORD=${AIRFLOW_PASSWORD}
+  #   volumes:
+  #     - ./services/airflow/dags:/opt/bitnami/airflow/dags
+  #   networks:
+  #     - backend
+  #   depends_on:
+  #     - init-db
+
+  # airflow-scheduler:
+  #   image: bitnami/airflow:latest
+  #   container_name: airflow-scheduler
+  #   environment:
+  #     - AIRFLOW_COMPONENT_TYPE=scheduler
+  #     - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
+  #     - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
+  #     - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
+  #     - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
+  #     - AIRFLOW_LOAD_EXAMPLES=no
+  #     - AIRFLOW_WEBSERVER_HOST=${AIRFLOW_WEBSERVER_HOST}
+  #   networks:
+  #     - backend
+  #   depends_on:
+  #     - airflow
+  #   volumes:
+  #     - ./services/airflow/dags:/opt/bitnami/airflow/dags
+
+  # airflow-trigger:
+  #   image: bitnami/airflow:latest
+  #   container_name: airflow-trigger
+  #   environment:
+  #     - AIRFLOW_COMPONENT_TYPE=triggerer
+  #     - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
+  #     - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
+  #     - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
+  #     - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
+  #     - AIRFLOW_WEBSERVER_HOST=${AIRFLOW_WEBSERVER_HOST}
+  #     - AIRFLOW_LOAD_EXAMPLES=no
+  #   networks:
+  #     - backend
+  #   depends_on:
+  #     - airflow
+  #   volumes:
+  #     - ./services/airflow/dags:/opt/bitnami/airflow/dags
   
-  airflow-dag-processor:
-    image: bitnami/airflow:latest
-    container_name: airflow-dag-processor
-    environment:
-      - AIRFLOW_COMPONENT_TYPE=dag-processor
-      - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
-      - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
-      - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
-      - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
-      - AIRFLOW_WEBSERVER_HOST=${AIRFLOW_WEBSERVER_HOST}
-      - AIRFLOW_LOAD_EXAMPLES=no
-    networks:
-      - backend
-    depends_on:
-      - airflow
-    volumes:
-      - ./dags:/opt/bitnami/airflow/dags
+  # airflow-dag-processor:
+  #   image: bitnami/airflow:latest
+  #   container_name: airflow-dag-processor
+  #   environment:
+  #     - AIRFLOW_COMPONENT_TYPE=dag-processor
+  #     - AIRFLOW_EXECUTOR=${AIRFLOW_EXECUTOR}
+  #     - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
+  #     - AIRFLOW_DATABASE_USERNAME=${POSTGRESQL_USERNAME}
+  #     - AIRFLOW_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD}
+  #     - AIRFLOW_WEBSERVER_HOST=${AIRFLOW_WEBSERVER_HOST}
+  #     - AIRFLOW_LOAD_EXAMPLES=no
+  #   networks:
+  #     - backend
+  #   depends_on:
+  #     - airflow
+  #   volumes:
+  #     - ./services/airflow/dags:/opt/bitnami/airflow/dags
 
   postgresql:
     image: bitnami/postgresql:latest
@@ -111,8 +126,7 @@ services:
     depends_on:
       - postgresql
     volumes:
-      - ./postgres-init:/docker-entrypoint-initdb.d
-      - ./postgres-init/init_db.py:/init_db.py
+      - ./services/postgres-init/:/app
     environment:
       - POSTGRESQL_USERNAME=${POSTGRESQL_USERNAME}
       - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
@@ -120,10 +134,11 @@ services:
       - DATABASE_PORT=${DATABASE_PORT}
       - MLFLOW_DATABASE_NAME=${MLFLOW_DATABASE_NAME}
       - AIRFLOW_DATABASE_NAME=${AIRFLOW_DATABASE_NAME}
+      - SENSORS_DATABASE_NAME=${SENSORS_DATABASE_NAME}
     networks:
       - backend
     entrypoint: >
-      bash -c "pip install psycopg2-binary python-dotenv && python /init_db.py"
+      bash -c "pip install psycopg2-binary python-dotenv && python /app/init_databases.py"
 
   pgadmin:
     image: dpage/pgadmin4
@@ -136,42 +151,42 @@ services:
     networks:
       - backend
     volumes:
-      - ./pgadmin:/var/lib/pgadmin
+      - ./services/pgadmin:/var/lib/pgadmin
 
-  mlflow:
-    image: bitnami/mlflow:latest 
-    container_name: mlflow
-    restart: unless-stopped
-    ports:
-      - "5000:5000" # MLflow UI at http://localhost:5000
-    environment:
-      - BACKEND_STORE_URI=${BACKEND_STORE_URI}
-      - ARTIFACT_ROOT=${ARTIFACT_ROOT}
-      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
-    volumes:
-      - ./mlflow:/mlflow
-    networks:
-      - backend
-    entrypoint: mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRESQL_USERNAME}:${POSTGRESQL_PASSWORD}@${DATABASE_HOST}:5432/${MLFLOW_DATABASE_NAME} --default-artifact-root minio://${MLFLOW_S3_BUCKET}/ --artifacts-destination minio://${MLFLOW_S3_BUCKET}/ -h 0.0.0.0
-    depends_on:
-      - minio
-      - init-db
+  # mlflow:
+  #   image: bitnami/mlflow:latest 
+  #   container_name: mlflow
+  #   restart: unless-stopped
+  #   ports:
+  #     - "5000:5000" # MLflow UI at http://localhost:5000
+  #   environment:
+  #     - BACKEND_STORE_URI=${BACKEND_STORE_URI}
+  #     - ARTIFACT_ROOT=${ARTIFACT_ROOT}
+  #     - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
+  #   volumes:
+  #     - ./services/mlflow:/mlflow
+  #   networks:
+  #     - backend
+  #   entrypoint: mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRESQL_USERNAME}:${POSTGRESQL_PASSWORD}@${DATABASE_HOST}:5432/${MLFLOW_DATABASE_NAME} --default-artifact-root minio://${MLFLOW_S3_BUCKET}/ --artifacts-destination minio://${MLFLOW_S3_BUCKET}/ -h 0.0.0.0
+  #   depends_on:
+  #     - minio
+  #     - init-db
 
-  minio:
-    image: minio/minio:latest
-    container_name: minio
-    restart: unless-stopped
-    ports:
-      - "9000:9000" # MinIO UI at http://localhost:9000
-      - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-    volumes:
-      - ./minio/data:/data
-    command: server /data --console-address ":9001"
-    networks:
-      - backend
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: minio
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9000:9000" # MinIO UI at http://localhost:9000
+  #     - "9001:9001"
+  #   environment:
+  #     - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+  #     - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+  #   volumes:
+  #     - ./services/minio/data:/data
+  #   command: server /data --console-address ":9001"
+  #   networks:
+  #     - backend
 
 networks:
   backend:
