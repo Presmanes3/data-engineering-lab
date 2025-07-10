@@ -1,46 +1,43 @@
-from itertools import count
-from kafka import KafkaProducer
 import json
+import random
 import time
 
-class KafkaJsonProducer:
-    def __init__(self, bootstrap_servers, topic):
-        self.producer = KafkaProducer(
-            bootstrap_servers=bootstrap_servers,
-            batch_size=32768,
-            linger_ms=5,
-            value_serializer=lambda v: json.dumps(v).encode('utf-8')
-        )
-        self.topic = topic
+from datetime import datetime
+from kafka import KafkaProducer
+from pydantic import ValidationError
+from src.schemas.sensor.reading import SensorReadingCreate, SensorReadingBase  # Usa tu modelo
 
-    def send_message(self, key, value):
+from loguru import logger as logging
+
+KAFKA_TOPIC = "sensor-readings"
+KAFKA_BOOTSTRAP_SERVERS = "localhost:9094"
+
+producer = KafkaProducer(
+    bootstrap_servers=[KAFKA_BOOTSTRAP_SERVERS],
+    value_serializer=lambda v: json.dumps(v).encode("utf-8")
+)
+
+def generate_sensor_data() -> SensorReadingBase:
+    return SensorReadingBase(
+        timestamp=datetime.utcnow().isoformat(),
+        machine_id=f"machine_{random.randint(1, 3)}",
+        temperature=round(random.uniform(50, 100), 2),
+        vibration=round(random.uniform(0.1, 5.0), 2),
+        pressure=round(random.uniform(2.0, 10.0), 2),
+        power_consumption=round(random.uniform(1000, 5000), 2)
+    )
+
+def run_producer():
+    logging.info("[Kafka Producer] Starting to send messages...")
+    while True:
+        payload = generate_sensor_data()
         try:
-            self.producer.send(self.topic, key=key.encode('utf-8'), value=value)
-            # self.producer.flush()
-            # print(f"Message sent to topic {self.topic}: {value}")
-        except Exception as e:
-            print(f"Failed to send message: {e}")
-
-    def close(self):
-        self.producer.close()
+            
+            producer.send(KAFKA_TOPIC, value=payload.model_dump_json())
+            logging.info(f"[✓] Sent reading for {payload.machine_id}")
+        except ValidationError as e:
+            logging.warning(f"[Validation Error] {e}")
+        time.sleep(2)
 
 if __name__ == "__main__":
-    # Configuration
-    BOOTSTRAP_SERVERS = ['localhost:9092']
-    TOPIC = 'your_topic_name'
-
-    # Initialize producer
-    producer = KafkaJsonProducer(BOOTSTRAP_SERVERS, TOPIC)
-
-    # Example usage
-    try:
-        start_time = time.time()
-        counter = 0
-        while counter < 10000:
-            # time.sleep(0.001)
-            producer.send_message(key="key1", value={"message": f"Hello, Kafka! -> {time.time()}", "counter": counter})
-            counter += 1
-        end_time = time.time()
-        print(f"Time taken to send 1000 messages: {end_time - start_time}s")
-    finally:
-        producer.close()
+    run_producer()
