@@ -49,6 +49,18 @@ services:
     volumes:
       - pgadmin-data:/var/lib/pgadmin
 
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"  # UI en http://localhost:3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    networks:
+      - backend
+    volumes:
+      - grafana-storage:/var/lib/grafana
 
 
   # airflow:
@@ -171,6 +183,8 @@ volumes:
   postgres-data:
     driver: local
   pgadmin-data:
+    driver: local
+  grafana-storage:
     driver: local
   # mlflow-data:
   #   driver: local

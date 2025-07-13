@@ -85,8 +85,8 @@ Predict a machine’s power consumption for the next 15 minutes using historical
 - Show and validate model predictions
 
 # Roadmap
-- [ ] Sensor simulation and Kafka streaming
-- [ ] Data ingestion and storage in PostgreSQL
+- [X] Sensor simulation and Kafka streaming
+- [X] Data ingestion and storage in PostgreSQL
 - [ ] Grafana dashboards
 - [ ] Power consumption forecasting (MVP with XGBoost)
 - [ ] MLflow integration and model deployment
