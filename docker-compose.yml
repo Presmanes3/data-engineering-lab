@@ -138,40 +138,47 @@ services:
   #   volumes:
   #     - ./services/airflow/dags:/opt/bitnami/airflow/dags
   
-  # mlflow:
-  #   image: bitnami/mlflow:latest 
-  #   container_name: mlflow
-  #   restart: unless-stopped
-  #   ports:
-  #     - "5000:5000" # MLflow UI at http://localhost:5000
-  #   environment:
-  #     - BACKEND_STORE_URI=${BACKEND_STORE_URI}
-  #     - ARTIFACT_ROOT=${ARTIFACT_ROOT}
-  #     - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
-  #   volumes:
-  #     - ./services/mlflow:/mlflow
-  #   networks:
-  #     - backend
-  #   entrypoint: mlflow server --backend-store-uri postgresql+psycopg2://${POSTGRESQL_USERNAME}:${POSTGRESQL_PASSWORD}@${DATABASE_HOST}:5432/${MLFLOW_DATABASE_NAME} --default-artifact-root minio://${MLFLOW_S3_BUCKET}/ --artifacts-destination minio://${MLFLOW_S3_BUCKET}/ -h 0.0.0.0
-  #   depends_on:
-  #     - minio
-  #     - init-db
+  mlflow:
+    image: bitnami/mlflow:latest 
+    container_name: mlflow
+    restart: unless-stopped
+    ports:
+      - "5000:5000" # MLflow UI at http://localhost:5000
+    environment:
+      - BACKEND_STORE_URI=${BACKEND_STORE_URI}
+      - ARTIFACT_ROOT=${ARTIFACT_ROOT}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
+    volumes:
+      - mlflow-data:/mlflow
+    networks:
+      - backend
+    entrypoint: >
+      mlflow server 
+      --backend-store-uri postgresql+psycopg2://${POSTGRESQL_USERNAME}:${POSTGRESQL_PASSWORD}@${DATABASE_HOST}:5432/${MLFLOW_DATABASE_NAME} 
+      --default-artifact-root s3://${MLFLOW_S3_BUCKET}/ 
+      --host 0.0.0.0
+      --port 5000
+    depends_on:
+      - minio
+      # - init-db
 
-  # minio:
-  #   image: minio/minio:latest
-  #   container_name: minio
-  #   restart: unless-stopped
-  #   ports:
-  #     - "9000:9000" # MinIO UI at http://localhost:9000
-  #     - "9001:9001"
-  #   environment:
-  #     - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-  #     - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-  #   volumes:
-  #     - ./services/minio/data:/data
-  #   command: server /data --console-address ":9001"
-  #   networks:
-  #     - backend
+  minio:
+    image: minio/minio:latest
+    container_name: minio_data_engineering
+    restart: unless-stopped
+    ports:
+      - "9000:9000" # MinIO UI at http://localhost:9000
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data-engineering:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - backend
 
 networks:
   backend:
@@ -186,7 +193,7 @@ volumes:
     driver: local
   grafana-storage:
     driver: local
-  # mlflow-data:
-  #   driver: local
-  # minio-data:
-  #   driver: local
+  mlflow-data:
+    driver: local
+  minio-data-engineering:
+    driver: local
